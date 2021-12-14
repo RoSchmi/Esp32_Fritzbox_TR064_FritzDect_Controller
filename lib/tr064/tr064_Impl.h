@@ -480,8 +480,8 @@ String TR064::httpRequest(String url, String xml, String soapaction, bool retry,
 
         // file found at server
         // RoSchmi: outcommented alternative for tests/debugging
-        if (true) {  
-        //if (httpCode == HTTP_CODE_OK) {           
+        //if (true) {  
+        if (httpCode == HTTP_CODE_OK) {           
             payload = _instHttp->getString();
         }  
         _instHttp->end();
