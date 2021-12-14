@@ -10,6 +10,12 @@
 //
 // With this modification https transmission can be used to
 // access Fritzbox via Tr-064 protocol
+// In file config.h it can be selected if http or https is used.
+// The certificate needed for https (and how it can be got)
+// can be found in config.h 
+// In file config_secret.h the WiFi credentials and the credentials
+// of the Fritzbox have to be entered (use config_secret_template.h
+// as a template)
 
 // Settings which have to be done on the Fritzbox can be found here:
 // https://www.schlaue-huette.de/apis-co/fritz-tr064/
@@ -30,7 +36,6 @@
 #include <tr064.h>
 #include "config_secret.h"
 #include "config.h"
-
 #include "WiFiClientSecure.h"
 
 // Default Esp32 stack size of 8192 byte is not enough for some applications.
@@ -53,8 +58,7 @@ X509Certificate myX509Certificate = myfritzbox_root_ca;
     static WiFiClient wifi_client;
     Protocol protocol = Protocol::useHttp;
 #endif
-
-    
+  
 HTTPClient http;
 static HTTPClient * httpPtr = &http;
         
@@ -88,7 +92,8 @@ const char* IP = FRITZ_IP_ADDRESS;
 // TR-064 connection
 TR064 connection(PORT, IP, fuser, fpass, protocol, wifi_client, httpPtr, myX509Certificate);
  
-// Die AIN der DECT!200 Steckdose findet sich im FritzBox Webinterface
+// The AIN of the DECT!200 switchable power socket can be found in FritzBox Webinterface
+// an on the device
 //const String Steckdose1 = "12345 1234567";
 
 const String Steckdose1 = FRITZ_DEVICE_AIN_01;
@@ -110,62 +115,50 @@ void setup() {
     // Connect to wifi
     ensureWIFIConnection();
     Serial.println(F("WIFI connected..."));
-
+    
+    // optinal delay
     delay(5000);
 
-    // Bei Problemen kann hier die Debug Ausgabe aktiviert werden
+    // In the case of issues the Debug output can be activated here
     connection.debug_level = DEBUG_VERBOSE;
-    
+    //connection.debug_level = DEBUG_ERROR;
+
     connection.init();
-
-    connection.showHomeauto_Services();
-
-    //SetDeviceName(Steckdose1, "FRITZ!DECT 210 #1");
-    GetDeviceInfo(Steckdose1);
-    //GetGenericDeviceInfo("1");
-    //SetSwitch(Steckdose1, "ON");
-    //SetSwitch(Steckdose1, "OFF");
-
-    //WahlRundruf();
-  
-while (true)
-    {
-        delay(5000);
-        Serial.println("Infinite loop");
-    }
     
+    // if wanted show functions of homeauto service
+    // connection.showHomeauto_Services();
     
+    // if wanted rename the power socket
+    //SetDeviceName(Steckdose1, "FRITZ!DECT 210 #1");  
 }
  
 void loop() {
     delay(200);
-    //GetGenericDeviceInfo(Steckdose1);
+    
     GetDeviceInfo(Steckdose1);
-    delay(500);
+
+    // If wanted get genericDeviceInfo
+    GetGenericDeviceInfo("0");   // Index homeautomation device list
+    delay(2000);
+    // Switch on
+    SetSwitch(Steckdose1, "ON");
+    Serial.println("Switched on");
+    delay(10000);
+    SetSwitch(Steckdose1, "OFF");
+    Serial.println("Switched off");
+    delay(5000);
+    GetDeviceInfo(Steckdose1);
+
+    // if wanted ring phone
+    // "Wählhilfe" in Fritzbox must be activated
+    // https://service.avm.de/help/de/FRITZ-Box-Fon-WLAN-7490/017p1/hilfe_fon_waehlhilfe
+    WahlRundruf();
+ 
     while (true)
     {
         delay(5000);
-        Serial.println("Infinite loop in loop()");
-    }
-    //GetGenericDeviceInfo(Steckdose1);
-    delay(500);
-    //Serial.println("Making Wahlrundruf");
-    //WahlRundruf();
-
-    GetDeviceInfo(Steckdose1);
-    delay(500);
-    SetSwitch(Steckdose1, "ON");
-    Serial.println(F("Switched on"));
-    delay(20000);
-    SetSwitch(Steckdose1, "OFF");
-     Serial.println(F("Switched off"));
-    delay(20000);
-
-
-    while (true)
-    {
-        delay(200);
-    }
+        Serial.println("Funtions ended, now performing infinite loop");
+    }  
 }
 
 void SetDeviceName(String AIN, String newName)
@@ -182,10 +175,8 @@ void SetSwitch(String AIN, String state) {
 }
  
 void GetDeviceInfo(String AIN) {
-    ensureWIFIConnection();
-    
+    ensureWIFIConnection();  
     String paramsb[][2] = {{"NewAIN", AIN}};
-    
     String reqb[][2] = {{"NewMultimeterPower", ""}, {"NewTemperatureCelsius", ""}};
     connection.action("urn:dslforum-org:service:X_AVM-DE_Homeauto:1", "GetSpecificDeviceInfos", paramsb, 1, reqb, 2);
     float power = reqb[0][1].toInt() / 100.0;
@@ -200,9 +191,9 @@ void GetDeviceInfo(String AIN) {
 
 void GetGenericDeviceInfo(String index) {
     ensureWIFIConnection();
-    String paramsb[][2] = {{"NewIndex", index}, {"NewAIN", ""}};
+    String paramsb[][2] = {{"NewIndex", index}};
     String reqb[][2] = {{"NewAIN", ""}};
-    connection.action("urn:dslforum-org:service:X_AVM-DE_Homeauto:1", "GetGenericDeviceInfos", paramsb, 2, reqb, 1);
+    connection.action("urn:dslforum-org:service:X_AVM-DE_Homeauto:1", "GetGenericDeviceInfos", paramsb, 1, reqb, 1);
     String name = reqb[0][1];
     
     Serial.print("Read AIN: ");
@@ -215,11 +206,14 @@ void WahlRundruf() {
       String service = "urn:dslforum-org:service:X_VoIP:1";
 
   // Die Telefonnummer **9 ist der Fritzbox-Rundruf.
+  // This function needs the "Wählhilfe" in Fritzbox to be
+  // activated
+  // https://service.avm.de/help/de/FRITZ-Box-Fon-WLAN-7490/017p1/hilfe_fon_waehlhilfe
   String call_params[][2] = {{"NewX_AVM-DE_PhoneNumber", "**9"}};
   connection.action(service, "X_AVM-DE_DialNumber", call_params, 1);
 
-  // Warte vier Sekunden bis zum auflegen
-  delay(4000);
+  // Warte 10 Sekunden bis zum Auflegen
+  delay(10000);
   connection.action(service, "X_AVM-DE_DialHangup");
   
 }
