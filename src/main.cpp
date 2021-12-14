@@ -152,7 +152,8 @@ void loop() {
     // if wanted ring phone
     // "Wählhilfe" in Fritzbox must be activated
     // https://service.avm.de/help/de/FRITZ-Box-Fon-WLAN-7490/017p1/hilfe_fon_waehlhilfe
-    WahlRundruf();
+    
+    // WahlRundruf();
  
     while (true)
     {
